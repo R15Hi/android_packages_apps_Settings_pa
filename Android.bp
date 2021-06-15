@@ -126,6 +126,7 @@ android_library {
         "androidx.room_room-runtime",
         "SystemUIUnfoldLib",
         "co.aospa.framework",
+        "glide",
     ],
 
     plugins: ["androidx.room_room-compiler-plugin"],
@@ -193,4 +194,9 @@ filegroup {
 filegroup {
     name: "Settings_manifest",
     srcs: ["AndroidManifest.xml"],
+}
+
+android_library_import {
+    name: "glide",
+    aars: ["libs/glide-4.9.0.aar"],
 }

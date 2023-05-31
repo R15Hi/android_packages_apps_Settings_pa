@@ -16,14 +16,16 @@
  * limitations under the License.
  */
 
-package com.android.settings.display
+package com.android.settings.security
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.content.pm.UserInfo
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.UserManager
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuInflater
@@ -42,29 +44,41 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 
-import com.android.internal.util.custom.cutout.CutoutFullscreenController
+import com.android.internal.util.custom.HideDeveloperStatusUtils
 
 import com.android.settings.R
 
 import com.google.android.material.appbar.AppBarLayout
 
-class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fullscreen_layout) {
+class HideDeveloperStatusSettings: Fragment(R.layout.hide_developer_status_layout) {
 
     private lateinit var activityManager: ActivityManager
     private lateinit var packageManager: PackageManager
     private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: AppListAdapter
     private lateinit var packageList: List<PackageInfo>
-    private lateinit var cutoutForceFullscreenSettings: CutoutFullscreenController
+    private lateinit var userManager: UserManager
+    private lateinit var userInfos: List<UserInfo>
 
-    private val appBarLayout: AppBarLayout by lazy {
+    private val appBarLayout: AppBarLayout by lazy{
         requireActivity().findViewById(R.id.app_bar)
     }
 
     private var searchText = ""
-    private var category: Int = CATEGORY_USER_ONLY
     private var customFilter: ((PackageInfo) -> Boolean)? = null
     private var comparator: ((PackageInfo, PackageInfo) -> Int)? = null
+    private var hideDeveloperStatusUtils: HideDeveloperStatusUtils = HideDeveloperStatusUtils()
+    private var showSystem = false
+    private var optionsMenu: Menu? = null
+
+    override fun onStart() {
+        super.onStart()
+        updateOptionsMenu()
+        val host = getActivity()
+        if (host != null) {
+            host.invalidateOptionsMenu();
+        }
+    }
 
     @SuppressLint("QueryPermissionsNeeded")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,12 +87,16 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
         requireActivity().setTitle(getTitle())
         activityManager = requireContext().getSystemService(ActivityManager::class.java)
         packageManager = requireContext().packageManager
-        packageList = packageManager.getInstalledPackages(0)
-        cutoutForceFullscreenSettings = CutoutFullscreenController(requireContext());
+        packageList = packageManager.getInstalledPackages(PackageManager.MATCH_ANY_USER)
+        userManager = UserManager.get(requireContext())
+        userInfos = userManager.getUsers()
+        for (info in userInfos) {
+            hideDeveloperStatusUtils.setApps(requireContext(), info.id)
+        }
     }
 
     private fun getTitle(): Int {
-        return R.string.display_cutout_force_fullscreen_title
+        return R.string.hide_developer_status_title
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -94,7 +112,7 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
      * @return an initial list of packages that should appear as selected.
      */
     private fun getInitialCheckedList(): List<String> {
-        val flattenedString = Settings.System.getString(
+        val flattenedString = Settings.Secure.getString(
             requireContext().contentResolver, getKey()
         )
         return flattenedString?.takeIf {
@@ -103,7 +121,16 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.cutout_force_fullscreen_menu, menu)
+        val activity = getActivity()
+        if (activity == null) {
+            return;
+        }
+        optionsMenu = menu;
+        inflater.inflate(R.menu.hide_developer_status_menu, menu)
+
+        menu.findItem(R.id.show_system).setVisible(showSystem)
+        menu.findItem(R.id.hide_system).setVisible(!showSystem)
+
         val searchMenuItem = menu.findItem(R.id.search) as MenuItem
         searchMenuItem.setOnActionExpandListener(object: MenuItem.OnActionExpandListener {
             override fun onMenuItemActionExpand(item: MenuItem): Boolean {
@@ -122,7 +149,7 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
             }
         })
         val searchView = searchMenuItem.actionView as SearchView
-        searchView.queryHint = getString(R.string.display_cutout_force_fullscreen_search_apps)
+        searchView.queryHint = getString(R.string.search_apps)
         searchView.setOnQueryTextListener(object: SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String) = false
 
@@ -132,6 +159,37 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
                 return true
             }
         })
+
+        updateOptionsMenu()
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        var i = item.getItemId()
+        if (i == R.id.show_system || i == R.id.hide_system) {
+            showSystem = !showSystem;
+            refreshList();
+        }
+        updateOptionsMenu()
+        return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        updateOptionsMenu()
+    }
+
+    override fun onDestroyOptionsMenu() {
+        optionsMenu = null;
+    }
+
+    private fun updateOptionsMenu() {
+        if (optionsMenu == null) {
+            return;
+        }
+
+        var menu = optionsMenu as Menu
+
+        menu.findItem(R.id.show_system).setVisible(!showSystem)
+        menu.findItem(R.id.hide_system).setVisible(showSystem)
     }
 
     /**
@@ -141,10 +199,12 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
      */
     private fun onListUpdate(packageName: String, isChecked: Boolean) {
         if (packageName.isBlank()) return
-        if (isChecked) {
-            cutoutForceFullscreenSettings.addApp(packageName);
-        } else {
-            cutoutForceFullscreenSettings.removeApp(packageName);
+        for (info in userInfos) {
+            if (isChecked) {
+                hideDeveloperStatusUtils.addApp(requireContext(), packageName, info.id)
+            } else {
+                hideDeveloperStatusUtils.removeApp(requireContext(), packageName, info.id)
+            }
         }
         try {
             activityManager.forceStopPackage(packageName);
@@ -153,17 +213,23 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
     }
 
     private fun getKey(): String {
-        return Settings.System.FORCE_FULLSCREEN_CUTOUT_APPS
+        return Settings.Secure.HIDE_DEVELOPER_STATUS
     }
 
     private fun refreshList() {
         var list = packageList.filter {
-            when (category) {
-                CATEGORY_SYSTEM_ONLY -> it.applicationInfo.isSystemApp()
-                CATEGORY_USER_ONLY -> !it.applicationInfo.isSystemApp() && !resources.getStringArray(
-                                        R.array.cutout_force_fullscreen_hidden_apps)
-                                            .asList().contains(it.applicationInfo.packageName)
-                else -> true
+            if (!showSystem) {
+                !it.applicationInfo.isSystemApp()
+                && !resources.getStringArray(
+                        R.array.hide_developer_status_hidden_apps)
+                            .asList().contains(it.applicationInfo.packageName)
+                && !it.applicationInfo.packageName.contains("android.settings")
+            } else {
+                !resources.getStringArray(
+                    R.array.hide_developer_status_hidden_apps)
+                        .asList().contains(it.applicationInfo.packageName)
+                && !it.applicationInfo.packageName.contains("android.settings")
+                && !it.applicationInfo.isResourceOverlay()
             }
         }.filter {
             getLabel(it).contains(searchText, true)
@@ -197,20 +263,20 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
             AppListViewHolder(layoutInflater.inflate(
-                R.layout.cutout_force_fullscreen_list_item, parent, false))
+                R.layout.hide_developer_status_list_item, parent, false))
 
         override fun onBindViewHolder(holder: AppListViewHolder, position: Int) {
             getItem(position).let {
-                holder.packageName = it.packageName
                 holder.label.text = it.label
+                holder.packageName.text = it.packageName
                 holder.icon.setImageDrawable(it.icon)
                 holder.itemView.setOnClickListener {
                     if (selectedIndices.contains(position)) {
                         selectedIndices.remove(position)
-                        onListUpdate(holder.packageName, false)
+                        onListUpdate(holder.packageName.text.toString(), false)
                     } else {
                         selectedIndices.add(position)
-                        onListUpdate(holder.packageName, true)
+                        onListUpdate(holder.packageName.text.toString(), true)
                     }
                     notifyItemChanged(position)
                 }
@@ -230,9 +296,9 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
     }
 
     private class AppListViewHolder(itemView: View): RecyclerView.ViewHolder(itemView) {
-        var packageName: String = ""
         val icon: ImageView = itemView.findViewById(R.id.icon)
         val label: TextView = itemView.findViewById(R.id.label)
+        val packageName: TextView = itemView.findViewById(R.id.packageName)
         val checkBox: CheckBox = itemView.findViewById(R.id.checkBox)
     }
 
@@ -243,9 +309,6 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
     )
 
     companion object {
-        const val CATEGORY_SYSTEM_ONLY = 0
-        const val CATEGORY_USER_ONLY = 1
-
         private val itemCallback = object: DiffUtil.ItemCallback<AppInfo>() {
             override fun areItemsTheSame(oldInfo: AppInfo, newInfo: AppInfo) =
                 oldInfo.packageName == newInfo.packageName

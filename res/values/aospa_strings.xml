@@ -169,4 +169,44 @@
     <string name="quick_settings_quick_pull_down_title">Quick QS pulldown</string>
     <string name="quick_settings_quick_pull_down_summary">Pull down statusbar from right side to expand quick settings</string>
 
+    <!-- Doze on charge -->
+    <string name="doze_on_charge_title">Always on when charging</string>
+    <string name="doze_on_charge_summary">Always show time and info only when the device is plugged in</string>
+
+    <!-- Pocket mode -->
+    <string name="proximity_wake_title">Prevent accidental wake-up</string>
+    <string name="proximity_wake_summary">Check the proximity sensor prior to waking up screen</string>
+
+    <!-- Smart 5G -->
+    <string name="smart_5g_title">Smart 5G</string>
+    <string name="smart_5g_summary">Automatically switch between 5G and 4G to reduce battery consumption</string>
+
+    <!-- Annoying Notifications -->
+    <string name="notification_sound_vib_screen_on_title">Annoying notifications</string>
+    <string name="notification_sound_vib_screen_on_summary">Play sound and vibration for notifications when the screen is on</string>
+
+    <!-- Notch: Full screen apps -->
+    <string name="display_cutout_force_fullscreen_title">Full screen apps</string>
+    <string name="display_cutout_force_fullscreen_summary">Force apps to ignore notch space</string>
+    <string name="display_cutout_force_fullscreen_search">Search</string>
+    <string name="display_cutout_force_fullscreen_search_apps">Search apps</string>
+
+    <!-- Horizon Light -->
+    <string name="keywords_pulse_ambient_light_display">notification, notifications, edge, light, colour, color</string>
+    <string name="pulse_ambient_light_text">Edge lighting makes your screen glow when you receive a notification. This makes it easier to figure when you get a pulse while the phone is doze mode.</string>
+    <string name="pulse_ambient_light_title">Edge lighting</string>
+    <string name="pulse_ambient_light_summary">Light up the side edges of the screen on notification pulse</string>
+    <string name="ambient_notification_light_accent_title">System accent color</string>
+    <string name="ambient_notification_light_color_automatic_title">Notification color</string>
+    <string name="pulse_ambient_light_color">When pulsing, use</string>
+
+    <!-- Refresh rate -->
+    <string name="refresh_rate_title">Refresh rate</string>
+    <string name="refresh_rate_summary_vrr_off">%d Hz</string>
+    <string name="refresh_rate_summary_vrr_on">%d Hz (Adaptive)</string>
+    <string name="refresh_rate_vrr_title">Adaptive refresh rate</string>
+    <string name="refresh_rate_vrr_summary">Automatically lower the refresh rate when the display is idle, to save power. May cause flickering or color shift on certain displays</string>
+    <string name="refresh_rate_footer">A higher refresh rate makes the display smoother, but increases power consumption</string>
+    <string name="keywords_refresh_rate">refresh, rate, smooth, peak, 60hz, 90hz, 120hz, 144hz, 165hz</string>
+
 </resources>

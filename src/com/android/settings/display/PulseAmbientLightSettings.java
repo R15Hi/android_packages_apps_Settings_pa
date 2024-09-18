@@ -131,7 +131,7 @@ public class PulseAmbientLightSettings extends SettingsPreferenceFragment
         public PulseAmbientLightEnabler(SettingsMainSwitchBar switchBar) {
             mContext = switchBar.getContext();
             mSwitchBar = switchBar;
-            mSwitchBar.setTitle("Use Edge lighting");
+            mSwitchBar.setTitle(mContext.getString(R.string.pulse_ambient_light_switch));
 
             mSwitchBar.show();
 

@@ -194,6 +194,7 @@
     <!-- Horizon Light -->
     <string name="keywords_pulse_ambient_light_display">notification, notifications, edge, light, colour, color</string>
     <string name="pulse_ambient_light_text">Edge lighting makes your screen glow when you receive a notification. This makes it easier to figure when you get a pulse while the phone is doze mode.</string>
+    <string name="pulse_ambient_light_switch">Use Edge lighting</string>
     <string name="pulse_ambient_light_title">Edge lighting</string>
     <string name="pulse_ambient_light_summary">Light up the side edges of the screen on notification pulse</string>
     <string name="ambient_notification_light_accent_title">System accent color</string>
@@ -261,5 +262,8 @@
     <string name="pattern_da_da" translatable="false">da-da</string>
     <string name="pattern_da_da_dzzz" translatable="false">da-da-dzzz</string>
     <string name="pattern_da_dzzz_da" translatable="false">da-dzzz-da</string>
+
+    <!-- Battery light -->
+    <string name="battery_light_title">Battery light</string>
 
 </resources>

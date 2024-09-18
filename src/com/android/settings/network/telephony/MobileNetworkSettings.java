@@ -27,13 +27,16 @@ import static android.telephony.NetworkRegistrationInfo.DOMAIN_PS;
 
 import android.app.Activity;
 import android.app.settings.SettingsEnums;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.UserManager;
 import android.provider.SearchIndexableResource;
 import android.provider.Settings;
+import android.telephony.CarrierConfigManager;
 import android.telephony.NetworkRegistrationInfo;
 import android.telephony.ServiceState;
 import android.telephony.SubscriptionInfo;
@@ -44,6 +47,7 @@ import android.telephony.ims.ImsManager;
 import android.telephony.ims.ImsMmTelManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -133,9 +137,10 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
     private MobileNetworkInfoEntity mMobileNetworkInfoEntity;
 
     private static ImsManager mImsMgr;
-    private static CiwlanConfig mCiwlanConfig = null;
+    private static SparseArray<CiwlanConfig> mCiwlanConfig = new SparseArray();
     private boolean mExtTelServiceConnected = false;
     private ExtTelephonyManager mExtTelephonyManager;
+    private SubscriptionManager mSubscriptionManager;
     private final ServiceCallback mExtTelServiceCallback = new ServiceCallback() {
         @Override
         public void onConnected() {
@@ -151,19 +156,35 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
         }
     };
 
-    private CiwlanConfig getCiwlanConfig() {
-        if (mCiwlanConfig != null) {
-            return mCiwlanConfig;
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED
+                    .equals(intent.getAction())) {
+                ThreadUtils.postOnMainThread(() -> {
+                    redrawPreferenceControllers();
+                });
+            }
+        }
+    };
+
+    private CiwlanConfig getCiwlanConfig(int... subscriptionId) {
+        if (subscriptionId.length != 0 && mCiwlanConfig != null) {
+            return mCiwlanConfig.get(subscriptionId[0]);
         }
         mExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 // Query the C_IWLAN config
-                try {
-                    mCiwlanConfig = mExtTelephonyManager.getCiwlanConfig(
-                            SubscriptionManager.getSlotIndex(mSubId));
-                } catch (RemoteException ex) {
-                    Log.e(LOG_TAG, "getCiwlanConfig exception", ex);
+                int[] activeSubIdList = mSubscriptionManager.getActiveSubscriptionIdList();
+                for (int i = 0; i < activeSubIdList.length; i++) {
+                    try {
+                        int subId = activeSubIdList[i];
+                        mCiwlanConfig.put(subId, mExtTelephonyManager.getCiwlanConfig(
+                                SubscriptionManager.getSlotIndex(subId)));
+                    } catch (RemoteException ex) {
+                        Log.e(LOG_TAG, "getCiwlanConfig exception", ex);
+                    }
                 }
             }
         });
@@ -200,10 +221,16 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
             Log.d(LOG_TAG, "isInCiwlanOnlyMode: C_IWLAN config null");
             return false;
         }
-        if (isRoaming()) {
-            return mCiwlanConfig.isCiwlanOnlyInRoam();
+        CiwlanConfig config = mCiwlanConfig.get(mSubId);
+        if (config != null) {
+            if (isRoaming()) {
+                return config.isCiwlanOnlyInRoam();
+            }
+            return config.isCiwlanOnlyInHome();
+        } else {
+            Log.d(LOG_TAG, "isInCiwlanOnlyMode: C_IWLAN config null for subId " + mSubId);
+            return false;
         }
-        return mCiwlanConfig.isCiwlanOnlyInHome();
     }
 
     static boolean isCiwlanModeSupported() {
@@ -211,7 +238,13 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
             Log.d(LOG_TAG, "isCiwlanModeSupported: C_IWLAN config null");
             return false;
         }
-        return mCiwlanConfig.isCiwlanModeSupported();
+        CiwlanConfig config = mCiwlanConfig.get(mSubId);
+        if (config != null) {
+            return config.isCiwlanModeSupported();
+        } else {
+            Log.d(LOG_TAG, "isCiwlanModeSupported: C_IWLAN config null for subId " + mSubId);
+            return false;
+        }
     }
 
     static boolean isRoaming() {
@@ -473,6 +506,7 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
 
         super.onCreate(icicle);
         final Context context = getContext();
+        mSubscriptionManager = context.getSystemService(SubscriptionManager.class);
         mExtTelephonyManager = ExtTelephonyManager.getInstance(context);
         mExtTelephonyManager.connectService(mExtTelServiceCallback);
         mUserManager = (UserManager) context.getSystemService(Context.USER_SERVICE);
@@ -498,6 +532,8 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
         mMobileNetworkRepository.updateEntity();
         // TODO: remove log after fixing b/182326102
         Log.d(LOG_TAG, "onResume() subId=" + mSubId);
+        getActivity().registerReceiver(mBroadcastReceiver,
+                new IntentFilter(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED));
     }
 
     private void onSubscriptionDetailChanged() {
@@ -524,6 +560,7 @@ public class MobileNetworkSettings extends AbstractMobileNetworkSettings impleme
     public void onPause() {
         mMobileNetworkRepository.removeRegister(this);
         super.onPause();
+        getActivity().unregisterReceiver(mBroadcastReceiver);
     }
 
     @Override

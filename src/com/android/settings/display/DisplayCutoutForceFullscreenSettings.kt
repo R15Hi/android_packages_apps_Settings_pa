@@ -160,9 +160,7 @@ class DisplayCutoutForceFullscreenSettings: Fragment(R.layout.cutout_force_fulls
         var list = packageList.filter {
             when (category) {
                 CATEGORY_SYSTEM_ONLY -> it.applicationInfo.isSystemApp()
-                CATEGORY_USER_ONLY -> !it.applicationInfo.isSystemApp() && !resources.getStringArray(
-                                        R.array.cutout_force_fullscreen_hidden_apps)
-                                            .asList().contains(it.applicationInfo.packageName)
+                CATEGORY_USER_ONLY -> !it.applicationInfo.isSystemApp()
                 else -> true
             }
         }.filter {
